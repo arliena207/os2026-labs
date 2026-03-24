@@ -16,7 +16,12 @@ int main(int argc, char *argv[]) {
     bool showversion = false;
 
     // 解析命令行参数
-    for (int i = 1 ; i<argc ;i++){
+    int start = 1;
+    if (argc > 1 && argv[1][0]!='-'){
+        start = 2;
+    }
+
+    for (int i = start ; i<argc ;i++){
         if (strcmp(argv[i],"--map")==0 || strcmp(argv[i],"-m")==0){
             if (i +1 >= argc){
                 return 1;
@@ -42,7 +47,7 @@ int main(int argc, char *argv[]) {
 
     // version 
     if (showversion){
-        if (argc != 2){
+        if (mapfilename != NULL || playerId != '\0' ||is_move){
             return 1;
         }
         printf("Labyrinth Game\n");
