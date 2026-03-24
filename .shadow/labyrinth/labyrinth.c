@@ -233,6 +233,8 @@ bool movePlayer(Labyrinth *labyrinth, char playerId, const char *direction) {
         col = -1;
     }else if (strcmp(direction,"right")==0){
         col = 1;
+    }else{
+        return false;
     }
 
     Position curr = findPlayer(labyrinth,playerId);
