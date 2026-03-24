@@ -66,7 +66,7 @@ int main(int argc, char *argv[]) {
 
     if (!is_move){
         for (int i = 0;i<labyrinth.rows;i++){
-            for (int j = 0;j<labyrinth.rows;j++){
+            for (int j = 0;j<labyrinth.cols;j++){
             putchar(labyrinth.map[i][j]);
         }
         putchar('\n');
