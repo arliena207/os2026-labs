@@ -5,6 +5,17 @@
 #include <string.h>
 #include <unistd.h>
 
+// 进程节点
+typedef struct Process{
+    pid_t pid;
+    pid_t ppid;
+    char name[128];
+
+    int *children;
+    int child_count;
+    int child_capacity;
+}Process;
+
 static void print_verison(void){
     printf("pstree 1.0\n");
 }
@@ -13,6 +24,87 @@ static void print_usage(const char *prog){
     fprintf(stderr,"Usage:%s [-p]--show-pids [-n]--numeric-sort [-V]--version\n",prog);
 }
 
+static int add_root(int **roots,int *count,int *capacity,int idx){
+    if(*count>=*capacity){
+        int new_capacity = (*capacity == 0)? 8 : (*capacity*2);
+        int *new_roots=realloc(*roots,new_capacity*sizeof(int));
+        if(!new_roots){
+            return -1;
+        }
+        *roots=new_roots;
+        *capacity=new_capacity;
+    }
+    (*roots)[(*count)++]=idx;
+    return 0;
+}
+
+static int add_process(Process **process,int *count,int *capacity,pid_t pid,pid_t ppid,const char *name){
+    if(*count>=*capacity){
+        int new_capacity = (*capacity == 0)?64 : (*capacity*2);
+        Process *new_process=realloc(*process,new_capacity*sizeof(Process));
+        if(!new_process){
+            return -1;
+        }
+        *process=new_process;
+        *capacity=new_capacity;
+    }
+
+    Process *p=&((*process)[*count]);
+    p->pid=pid;
+    p->ppid=ppid;
+    strncpy(p->name,name,sizeof(p->name)-1);
+    p->name[sizeof(p->name)-1]='\0';
+
+    p->children=NULL;
+    p->child_count=0;
+    p->child_capacity=0;
+
+    (*count)++;
+    return 0;
+}
+
+static int find_process_index(Process *process,int count,pid_t pid){
+    for (int i = 0;i<count;i++){
+        if(process[i].pid==pid){
+            return i;
+        }
+    }
+    return -1;
+}
+
+static int add_child(Process *process,int child_index){
+    if(process->child_count >= process->child_capacity){
+        int new_capacity = (process->child_capacity == 0)?4:(process->child_capacity *2);
+        int *new_child=realloc(process->children,new_capacity*sizeof(int));
+        if(!new_child)return -1;
+        process->child_capacity=new_capacity;
+        process->children=new_child;
+    }
+
+    process->children[process->child_count++]=child_index;
+    return 0;
+}
+
+static void print_tree(Process *procs,int idx,int depth,int show_pids){
+    for (int i =0;i<depth;i++){
+        printf(" ");
+    }
+
+    if(show_pids){
+        printf("%s(%d)\n",procs[idx].name,procs[idx].pid);
+    }else{
+        printf("%s\n",procs[idx].name);
+    }
+
+    for(int i = 0;i<procs[idx].child_count;i++){
+        int child_idx=procs[idx].children[i];
+        print_tree(procs,child_idx,depth+1,show_pids);
+    }
+}
+
+static void sort_children_by_pid(Process *procs,Process *parent){
+    return;
+}
 
 static int read_comm(pid_t pid, char *buf, size_t n) {
     char path[64];
@@ -55,7 +147,7 @@ int main(int argc, char *argv[]) {
         else if (strcmp(argv[i],"-n")==0 || strcmp(argv[i],"--numeric-sort")==0){
             numeric_sort=1;
         }
-        else if (strcmp(argv[i],"-V")==0 || strcmp(argv[i],"--version")){
+        else if (strcmp(argv[i],"-V")==0 || strcmp(argv[i],"--version")==0){
             version=1;
         } 
         else{
@@ -70,14 +162,12 @@ int main(int argc, char *argv[]) {
         return 0;
     }
 
-    pid_t self = getpid();
-    pid_t parent = getppid();
-
-    char self_comm[256] = "?", parent_comm[256] = "?";
-    read_comm(self, self_comm, sizeof self_comm);
-    read_comm(parent, parent_comm, sizeof parent_comm);
-
-    printf("%s(%d)\n", parent_comm, parent);
+    Process *procs=NULL;
+    int proc_count=0;
+    int proc_capacity=0;
+    int *roots=NULL;
+    int root_count=0;
+    int root_capacity=0;
 
     DIR *d = opendir("/proc");
     if (!d) { perror("opendir /proc"); return 1; }
@@ -89,14 +179,67 @@ int main(int argc, char *argv[]) {
 
         pid_t ppid;
         if (get_ppid_from_stat(pid, &ppid) != 0) continue;
-        if (ppid != parent) continue;
 
         char comm[256] = "?";
-        read_comm(pid, comm, sizeof comm);
+        if(read_comm(pid, comm, sizeof (comm))!=0){
+            continue;
+        }
 
-        printf("  |- %s(%d)%s\n", comm, pid, (pid == self) ? "  <== me" : "");
+        if (add_process(&procs,&proc_count,&proc_capacity,pid,ppid,comm)!=0){
+            fprintf(stderr,"memory allocate failed!!!");
+            closedir(d);
+            free(procs);
+            return 1;
+        }
     }
 
     closedir(d);
+
+    // 建树
+    for (int i = 0;i<proc_count;i++){
+        int parent_idx=find_process_index(procs,proc_count,procs[i].ppid);
+
+        if(parent_idx>=0){
+            if(add_child(&procs[parent_idx],i)!=0){
+                fprintf(stderr,"memory allocate failed!!!\n");
+                for (int j =0;j<proc_count;j++){
+                    free(procs[j].children);
+                }
+                free(procs);
+                free (roots);
+                return 1;
+            }
+        }else{
+            if(add_root(&roots,&root_count,&root_capacity,i)!=0){
+                fprintf(stderr,"memory allocate failed!!!\n");
+                for (int j =0;j<proc_count;j++){
+                    free(procs[j].children);
+                }
+                free(procs);
+                free (roots);
+                return 1;
+            }
+        }
+    }
+
+    if (numeric_sort){
+        for (int i =0;i<proc_count;i++){
+            sort_children_by_pid(procs,&procs[i]);
+        }
+    }
+
+    // print
+    for(int i=0;i<root_count;i++){
+        print_tree(procs,roots[i],0,show_pids);
+    }
+
+    // free memory
+    for(int i=0;i<proc_count;i++){
+        free(procs[i].children);
+    }
+    free(procs);
+    free(roots);
+
+
     return 0;
 }
