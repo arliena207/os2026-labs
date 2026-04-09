@@ -147,7 +147,7 @@ static int read_comm(pid_t pid, char *buf, size_t n) {
     return 0;
 }
 
-static int get_ppid_from_stat(pid_t pid, pid_t *ppid_out) {
+static int get_ppid_from_stat(pid_t pid, pid_t *ppid_out,char *name_out,size_t n) {
     char path[64], line[4096];
     snprintf(path, sizeof(path), "/proc/%d/stat", pid);
     FILE *f = fopen(path, "r");
@@ -159,6 +159,8 @@ static int get_ppid_from_stat(pid_t pid, pid_t *ppid_out) {
     char comm[256], state;
     if (sscanf(line, "%d (%255[^)]) %c %d", &id, comm, &state, &ppid) != 4) return -1;
     *ppid_out = (pid_t)ppid;
+    strncpy(name_out,comm,n-1);
+    name_out[n-1]='\0';
     return 0;
 }
 
@@ -208,11 +210,9 @@ int main(int argc, char *argv[]) {
         pid_t pid = (pid_t)atoi(de->d_name);
 
         pid_t ppid;
-        if (get_ppid_from_stat(pid, &ppid) != 0) continue;
-
-        char comm[256] = "?";
-        read_comm(pid, comm, sizeof (comm));
-
+        char comm[256];
+        if (get_ppid_from_stat(pid, &ppid,comm,sizeof(comm)) != 0) continue;
+        
         if (add_process(&procs,&proc_count,&proc_capacity,pid,ppid,comm)!=0){
             fprintf(stderr,"memory allocate failed!!!");
             closedir(d);
