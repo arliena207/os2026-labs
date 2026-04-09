@@ -87,7 +87,7 @@ static int add_child(Process *process,int child_index){
 
 static void print_tree(Process *procs,int idx,int depth,int show_pids){
     for (int i =0;i<depth;i++){
-        printf(" ");
+        printf("   ");
     }
 
     if(show_pids){
@@ -103,7 +103,18 @@ static void print_tree(Process *procs,int idx,int depth,int show_pids){
 }
 
 static void sort_children_by_pid(Process *procs,Process *parent){
-    return;
+    for (int i = 0;i<parent->child_count;i++){
+        for (int j=0;j<parent->child_count;j++){
+            int idx1=parent->children[i];
+            int idx2=parent->children[j];
+
+            if(procs[idx1].pid>procs[idx2].pid){
+                int t=parent->children[i];
+                parent->children[i]=parent->children[j];
+                parent->children[j]=t;
+            }
+        }
+    }
 }
 
 static int read_comm(pid_t pid, char *buf, size_t n) {
