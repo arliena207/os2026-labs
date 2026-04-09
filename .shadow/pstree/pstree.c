@@ -27,7 +27,7 @@ static void print_usage(const char *prog){
 static int is_number_str(const char *s){
     if(!s ||!*s)return 0;
     for (int i=0;s[i];i++){
-        if(isdigit((unsigned char)s[i]))return 0;
+        if(!isdigit((unsigned char)s[i]))return 0;
     }
     return 1;
 }
