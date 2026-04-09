@@ -52,10 +52,10 @@ int main(int argc, char *argv[]) {
         if (strcmp(argv[i],"-p")==0 || strcmp(argv[i],"--show-pids")==0){
             show_pids=1;
         }
-        else if (strcmp(argv[i],"-n")==0 | strcmp(argv[i],"--numeric-sort")==0){
+        else if (strcmp(argv[i],"-n")==0 || strcmp(argv[i],"--numeric-sort")==0){
             numeric_sort=1;
         }
-        else if (strcmp(argv[i],"-V")==0 | strcmp(argv[i],"--version")){
+        else if (strcmp(argv[i],"-V")==0 || strcmp(argv[i],"--version")){
             version=1;
         } 
         else{
