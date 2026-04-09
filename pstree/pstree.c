@@ -5,6 +5,15 @@
 #include <string.h>
 #include <unistd.h>
 
+static void print_verison(void){
+    printf("pstree 1.0\n");
+}
+
+static void print_usage(const char *prog){
+    fprintf(stderr,"Usage:%s [-p]--show-pids [-n]--numeric-sort [-V]--version\n",prog);
+}
+
+
 static int read_comm(pid_t pid, char *buf, size_t n) {
     char path[64];
     snprintf(path, sizeof(path), "/proc/%d/comm", pid);
@@ -31,7 +40,36 @@ static int get_ppid_from_stat(pid_t pid, pid_t *ppid_out) {
     return 0;
 }
 
-int main(void) {
+int main(int argc, char *argv[]) {
+
+    // 开关
+    int show_pids=0;
+    int version=0;
+    int numeric_sort=0;
+
+    // 参数解析
+    for (int i = 1;i<argc;i++){
+        if (strcmp(argv[i],"-p")==0 || strcmp(argv[i],"--show-pids")==0){
+            show_pids=1;
+        }
+        else if (strcmp(argv[i],"-n")==0 || strcmp(argv[i],"--numeric-sort")==0){
+            numeric_sort=1;
+        }
+        else if (strcmp(argv[i],"-V")==0 || strcmp(argv[i],"--version")){
+            version=1;
+        } 
+        else{
+            fprintf(stderr,"Invalid option : %s\n",argv[i]);
+            print_usage(argv[0]);
+            return 1;
+        }
+    }
+
+    if (version){
+        print_verison();
+        return 0;
+    }
+
     pid_t self = getpid();
     pid_t parent = getppid();
 
