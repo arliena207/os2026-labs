@@ -21,9 +21,16 @@ static void print_verison(void){
 }
 
 static void print_usage(const char *prog){
-    fprintf(stderr,"Usage:%s [-p]--show-pids [-n]--numeric-sort [-V]--version\n",prog);
+    fprintf(stderr,"Usage: %s [-p|--show-pids] [-n|--numeric-sort] [-V|--version]\n",prog);
 }
 
+static int is_number_str(const char *s){
+    if(!s ||!*s)return 0;
+    for (int i=0;s[i];i++){
+        if(!isdigit((unsigned char)s[i]))return 0;
+    }
+    return 1;
+}
 static int add_root(int **roots,int *count,int *capacity,int idx){
     if(*count>=*capacity){
         int new_capacity = (*capacity == 0)? 8 : (*capacity*2);
@@ -104,7 +111,7 @@ static void print_tree(Process *procs,int idx,int depth,int show_pids){
 
 static void sort_children_by_pid(Process *procs,Process *parent){
     for (int i = 0;i<parent->child_count;i++){
-        for (int j=0;j<parent->child_count;j++){
+        for (int j=i+1;j<parent->child_count;j++){
             int idx1=parent->children[i];
             int idx2=parent->children[j];
 
@@ -112,6 +119,18 @@ static void sort_children_by_pid(Process *procs,Process *parent){
                 int t=parent->children[i];
                 parent->children[i]=parent->children[j];
                 parent->children[j]=t;
+            }
+        }
+    }
+}
+
+static void sort_roots_by_pid(Process *procs, int *roots, int root_count){
+    for (int i = 0; i < root_count; i++) {
+        for (int j = i + 1; j < root_count; j++) {
+            if (procs[roots[i]].pid > procs[roots[j]].pid) {
+                int t = roots[i];
+                roots[i] = roots[j];
+                roots[j] = t;
             }
         }
     }
@@ -128,7 +147,7 @@ static int read_comm(pid_t pid, char *buf, size_t n) {
     return 0;
 }
 
-static int get_ppid_from_stat(pid_t pid, pid_t *ppid_out) {
+static int get_ppid_from_stat(pid_t pid, pid_t *ppid_out,char *name_out,size_t n) {
     char path[64], line[4096];
     snprintf(path, sizeof(path), "/proc/%d/stat", pid);
     FILE *f = fopen(path, "r");
@@ -140,6 +159,8 @@ static int get_ppid_from_stat(pid_t pid, pid_t *ppid_out) {
     char comm[256], state;
     if (sscanf(line, "%d (%255[^)]) %c %d", &id, comm, &state, &ppid) != 4) return -1;
     *ppid_out = (pid_t)ppid;
+    strncpy(name_out,comm,n-1);
+    name_out[n-1]='\0';
     return 0;
 }
 
@@ -185,17 +206,13 @@ int main(int argc, char *argv[]) {
 
     struct dirent *de;
     while ((de = readdir(d)) != NULL) {
-        if (!isdigit((unsigned char)de->d_name[0])) continue;
+        if (!is_number_str(de->d_name)) continue;
         pid_t pid = (pid_t)atoi(de->d_name);
 
         pid_t ppid;
-        if (get_ppid_from_stat(pid, &ppid) != 0) continue;
-
-        char comm[256] = "?";
-        if(read_comm(pid, comm, sizeof (comm))!=0){
-            continue;
-        }
-
+        char comm[256];
+        if (get_ppid_from_stat(pid, &ppid,comm,sizeof(comm)) != 0) continue;
+        
         if (add_process(&procs,&proc_count,&proc_capacity,pid,ppid,comm)!=0){
             fprintf(stderr,"memory allocate failed!!!");
             closedir(d);
@@ -237,6 +254,7 @@ int main(int argc, char *argv[]) {
         for (int i =0;i<proc_count;i++){
             sort_children_by_pid(procs,&procs[i]);
         }
+        sort_roots_by_pid(procs,roots,root_count);
     }
 
     // print
