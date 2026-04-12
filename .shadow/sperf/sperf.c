@@ -187,34 +187,24 @@ int main(int argc, char *argv[]) {
     if(pid == 0){//child
         close(fd[0]);
 
-        if (dup2(fd[1], STDERR_FILENO) < 0) {
+        if(dup2(fd[1],3)<0){
             perror("dup2");
             exit(1);
         }
         close(fd[1]);
 
-        int  nullfd=open("/dev/null",O_WRONLY);
-        if(nullfd < 0){
-            perror("open /dev/null");
-            exit(1);
-        }
-
-        if(dup2(nullfd,STDOUT_FILENO)<0){
-            perror("dup2 stdout");
-            exit(1);
-        }
-
-        close(nullfd);
         //strace
-        char **exec_argv= malloc (sizeof(char *)* (argc +2));
+        char **exec_argv= malloc (sizeof(char *)* (argc +4));
         exec_argv[0]="strace";
         exec_argv[1]="-T";
-        exec_argv[2]=path;
+        exec_argv[2]="-o";
+        exec_argv[3]="/proc/self/fd/3";
+        exec_argv[4]=path;
 
         for(int i=2;i<argc;i++){
-            exec_argv[i+1]=argv[i];
+            exec_argv[i+3]=argv[i];
         }
-        exec_argv[argc+1]=NULL;
+        exec_argv[argc+3]=NULL;
 
         execve("strace",          exec_argv, environ);
         execve("/bin/strace",     exec_argv, environ);
@@ -233,6 +223,9 @@ int main(int argc, char *argv[]) {
         int done = 0;
 
         int dirty=0;
+        struct timeval last_print,now;
+        gettimeofday(&last_print,NULL);
+
         while(!done){
             fd_set rfds;
             FD_ZERO(&rfds);
@@ -253,6 +246,7 @@ int main(int argc, char *argv[]) {
                 if(dirty){
                     print_top_syscalls(&stats,TOP_N);
                     dirty=0;
+                    gettimeofday(&last_print,NULL);
                 }
                 continue;
             }
@@ -288,6 +282,13 @@ int main(int argc, char *argv[]) {
                         line_len=0;
                     }
         
+                }
+                gettimeofday(&now,NULL);
+                long elapsed_us=(now.tv_sec-last_print.tv_sec)*1000000L+(now.tv_usec-last_print.tv_usec);
+                if(dirty && elapsed_us>=100000){
+                    print_top_syscalls(&stats,TOP_N);
+                    dirty=0;
+                    last_print=now;
                 }
             }
         }
