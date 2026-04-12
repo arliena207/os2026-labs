@@ -78,36 +78,33 @@ void add_syscall(syscall_stats *stats, const char *name, double time) {
 
 void print_top_syscalls(syscall_stats *stats, int n) {
     //找到前n个耗时最多的syscall
-    if (stats->count == 0 || stats->total_time <=0){
-        return ;
-    }
+    if(stats->count >0 && stats->total_time>0){
+        syscall_stat temp[MAX_SYSCALLS];
 
-    syscall_stat temp[MAX_SYSCALLS];
+        for (int i=0;i<stats->count;i++){
+            temp[i]=stats->stats[i];
+        }
 
-    for (int i=0;i<stats->count;i++){
-        temp[i]=stats->stats[i];
-    }
-
-    for(int i=0;i<stats->count;i++){
-        for(int j=i+1;j<stats->count;j++){
-            if(temp[j].time>temp[i].time){
-                syscall_stat t = temp[i];
-                temp[i]=temp[j];
-                temp[j]=t;
+        for(int i=0;i<stats->count;i++){
+            for(int j=i+1;j<stats->count;j++){
+                if(temp[j].time>temp[i].time){
+                    syscall_stat t = temp[i];
+                    temp[i]=temp[j];
+                    temp[j]=t;
+                }
             }
         }
-    }
 
-    int limit = n;
-    if(limit > stats->count){
-        limit = stats->count;
-    }
+        int limit = n;
+        if(limit > stats->count){
+            limit = stats->count;
+        }
 
-    for(int i=0;i<limit;i++){
-        int ratio = (int)(temp[i].time * 100/stats->total_time);
-        printf("%s (%d%%)\n", temp[i].name, ratio);
-    }
-    
+        for(int i=0;i<limit;i++){
+            int ratio = (int)(temp[i].time * 100/stats->total_time);
+            printf("%s (%d%%)\n", temp[i].name, ratio);
+        }
+}
     // 80 '\0'
     for (int i=0;i<80;i++){
         putchar('\0');
@@ -178,6 +175,18 @@ int main(int argc, char *argv[]) {
         }
         close(fd[1]);
 
+        int  nullfd=open("/dev/null",O_WRONLY);
+        if(nullfd < 0){
+            perror("open /dev/null");
+            exit(1);
+        }
+
+        if(dup2(nullfd,STDOUT_FILENO)<0){
+            perror("dup2 stdout");
+            exit(1);
+        }
+
+        close(nullfd);
         //strace
         char **exec_argv= malloc (sizeof(char *)* (argc +2));
         exec_argv[0]="strace";
@@ -205,6 +214,7 @@ int main(int argc, char *argv[]) {
         int line_len=0;
         int done = 0;
 
+        int dirty=0;
         while(!done){
             fd_set rfds;
             FD_ZERO(&rfds);
@@ -222,7 +232,10 @@ int main(int argc, char *argv[]) {
             }
 
             if(ret == 0){
-                print_top_syscalls(&stats,TOP_N);
+                if(dirty){
+                    print_top_syscalls(&stats,TOP_N);
+                    dirty=0;
+                }
                 continue;
             }
 
@@ -251,6 +264,7 @@ int main(int argc, char *argv[]) {
     
                         if(parse_strace_line(line,syscall_name,&time)){
                             add_syscall(&stats,syscall_name,time);
+                            dirty=1;
                         }
     
                         line_len=0;
@@ -259,7 +273,9 @@ int main(int argc, char *argv[]) {
                 }
             }
         }
-        print_top_syscalls(&stats,TOP_N);
+        if(dirty==1 || stats.count==0){
+            print_top_syscalls(&stats,TOP_N);
+        }
 
         close(fd[0]);
         waitpid(pid,NULL,0);
