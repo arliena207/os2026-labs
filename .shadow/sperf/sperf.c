@@ -38,8 +38,26 @@ int parse_strace_line(char *line, char *syscall_name, double *time) {
     strncpy(syscall_name, line, name_len);
     syscall_name[name_len] = '\0';
 
+    if(!((syscall_name[0]>='a' && syscall_name[0]<='z')||syscall_name[0]=='_')){
+        return 0;
+    }
+
+    for(int i=0;syscall_name[i]!='\0';i++){
+        char c=syscall_name[i];
+        if(!((c>='a'&&c<='z')||(c>='0'&&c<='9')||(c=='_'))){
+            return 0;
+        }
+    }
     char *lt = strrchr(line, '<');
     char *gt = strrchr(line, '>');
+
+    if(strstr(line,"=")==NULL){
+        return 0;
+    }
+
+    if(gt[1]!='\0'&& gt[1]!='\n'){
+        return 0;
+    }
     if (lt == NULL || gt == NULL || lt >= gt) {
         return 0;
     }
@@ -273,6 +291,19 @@ int main(int argc, char *argv[]) {
                 }
             }
         }
+        
+        if (line_len > 0) {
+            line[line_len] = '\0';
+        
+            char syscall_name[64];
+            double time;
+        
+            if (parse_strace_line(line, syscall_name, &time)) {
+                add_syscall(&stats, syscall_name, time);
+                dirty = 1;
+            }
+        }
+        
         if(dirty==1 || stats.count==0){
             print_top_syscalls(&stats,TOP_N);
         }
