@@ -136,7 +136,6 @@ char *resolve_command(const char *command){
     }
     char *path_env=getenv("PATH");
     if(path_env==NULL)return NULL;
-s
     char *path = strdup(path_env);
     char *ptr = NULL;
 
