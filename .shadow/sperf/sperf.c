@@ -61,14 +61,56 @@ int parse_strace_line(char *line, char *syscall_name, double *time) {
 }
 
 void add_syscall(syscall_stats *stats, const char *name, double time) {
-    // 把一次syscall耗时累加到统计表
+    // 把一次syscall累加到统计表
+    stats->total_time+=time;
 
+    for (int i = 0;i<stats->count;i++){
+        if (strcmp(stats->stats[i].name,name)==0){
+            stats->stats[i].time+=time;
+            return ;
+        }
+    }
+        if(stats->count < MAX_SYSCALLS){
+            strncpy(stats->stats[stats->count].name,name,sizeof(stats->stats[stats->count].name)-1);
+            stats->stats[stats->count].name[sizeof(stats->stats[stats->count].name)-1]='\0';
+            stats->stats[stats->count].time=time;
+            stats->count+=1;
+        }
+    
 }
 
 void print_top_syscalls(syscall_stats *stats, int n) {
     //找到前n个耗时最多的syscall
+    if (stats->count == 0 || stats->total_time <=0){
+        return ;
+    }
+
+    syscall_stat temp[MAX_SYSCALLS];
+
+    for (int i=0;i<stats->count;i++){
+        temp[i]=stats->stats[i];
+    }
+
+    for(int i=0;i<stats->count;i++){
+        for(int j=i+1;j<stats->count;j++){
+            if(temp[j].time>temp[i].time){
+                syscall_stat t = temp[i];
+                temp[i]=temp[j];
+                temp[j]=t;
+            }
+        }
+    }
+
+    int limit = n;
+    if(limit > stats->count){
+        limit = stats->count;
+    }
+
+    for(int i=0;i<limit;i++){
+        int ratio = (int)(temp[i].time * 100/stats->total_time);
+        printf("%s (%d%%)\n", temp[i].name, ratio);
+    }
     
-    //printf("%s (%d%%)\n", syscall_name, ratio);
 
 }
 
