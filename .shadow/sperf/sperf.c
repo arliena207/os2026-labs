@@ -24,6 +24,7 @@ typedef struct {
 
 int parse_strace_line(char *line, char *syscall_name, double *time) {
     // 解析一行strace输出
+    return 1;
 }
 
 void add_syscall(syscall_stats *stats, const char *name, double time) {
