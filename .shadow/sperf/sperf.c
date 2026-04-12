@@ -51,14 +51,15 @@ int parse_strace_line(char *line, char *syscall_name, double *time) {
     char *lt = strrchr(line, '<');
     char *gt = strrchr(line, '>');
 
-    if(strstr(line,"=")==NULL){
+    if (lt == NULL || gt == NULL || lt >= gt) {
+        return 0;
+    }
+
+    if(strstr(line," = ")==NULL){
         return 0;
     }
 
     if(gt[1]!='\0'&& gt[1]!='\n'){
-        return 0;
-    }
-    if (lt == NULL || gt == NULL || lt >= gt) {
         return 0;
     }
 
