@@ -131,12 +131,12 @@ void print_top_syscalls(syscall_stats *stats, int n) {
 }
 
 char *resolve_command(const char *command){
-    if(command[0]=='/'){
+    if(strchr(command,'/')!=NULL){
         return strdup(command);
     }
     char *path_env=getenv("PATH");
     if(path_env==NULL)return NULL;
-
+s
     char *path = strdup(path_env);
     char *ptr = NULL;
 
@@ -291,7 +291,7 @@ int main(int argc, char *argv[]) {
                 }
             }
         }
-        
+
         if (line_len > 0) {
             line[line_len] = '\0';
         
